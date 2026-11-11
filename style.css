@@ -94,3 +94,6 @@ output { display: block; margin-top: 8px; color: #44444a; font: .85rem ui-monosp
 .wifi-settings h3 { margin-top: 16px; }
 .wifi-settings form:not([hidden]) { display: grid; gap: 6px; max-width: 380px; margin-top: 10px; }
 .wifi-settings input { border: 1px solid #d2d2d7; border-radius: 8px; padding: 8px 10px; font: inherit; }
+.wifi-picker { display: flex; align-items: center; gap: 8px; }
+.wifi-picker select { flex: 1; min-width: 0; border: 1px solid #d2d2d7; border-radius: 8px; background: white; }
+.wifi-picker button { margin-top: 0; white-space: nowrap; }

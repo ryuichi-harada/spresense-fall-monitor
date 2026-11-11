@@ -3,16 +3,16 @@
 if (location.protocol === "http:" && location.hostname === "127.0.0.1") {
   const panel = document.getElementById("wifi-settings");
   const form = document.getElementById("wifi-config-form");
-  const ssid = document.getElementById("wifi-ssid");
   const password = document.getElementById("wifi-password");
-  const networks = document.getElementById("wifi-known-networks");
+  const networkSelect = document.getElementById("wifi-network-select");
+  const refreshNetworks = document.getElementById("wifi-networks-refresh");
   const status = document.getElementById("wifi-settings-status");
   const button = document.getElementById("wifi-config-save");
   const storageKey = "spresense.wifi-ssids.v1";
   const lastSsidKey = "spresense.wifi-last-ssid.v1";
   panel.hidden = false;
 
-  function updateNetworks(current) {
+  function savedNetworks(current) {
     let choices = current ? [current] : [];
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
@@ -22,14 +22,41 @@ if (location.protocol === "http:" && location.hostname === "127.0.0.1") {
     } catch {
       // The currently configured SSID remains available without browser storage.
     }
-    networks.replaceChildren(...choices.map((name) => new Option(name, name)));
+    return choices;
+  }
+
+  function showNetworks(visible, current) {
+    const choices = [...new Set([...visible, ...savedNetworks(current)])];
+    networkSelect.replaceChildren(
+      new Option("Wi-Fiを選択してください", ""),
+      ...choices.map((name) => new Option(name, name)),
+    );
+    networkSelect.value = choices.includes(current) ? current : "";
+  }
+
+  async function scanNetworks(current = networkSelect.value) {
+    refreshNetworks.disabled = true;
+    networkSelect.disabled = true;
+    networkSelect.replaceChildren(new Option("周囲のWi-Fiを検索しています…", ""));
+    try {
+      const response = await fetch("/api/wifi-networks", { cache: "no-store" });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      showNetworks(Array.isArray(data.networks) ? data.networks : [], current);
+      if (!data.networks?.length) status.textContent = "周囲のWi-Fiが見つかりません。SSIDは手入力できます。";
+    } catch {
+      showNetworks([], current);
+      status.textContent = "Wi-Fi一覧を取得できません。SSIDは手入力できます。";
+    } finally {
+      refreshNetworks.disabled = false;
+      networkSelect.disabled = false;
+    }
   }
 
   function showSettings(settings) {
     const lastSsid = localStorage.getItem(lastSsidKey) || settings.ssid;
-    ssid.value = lastSsid;
-    updateNetworks(lastSsid);
     form.hidden = false;
+    scanNetworks(lastSsid);
   }
 
   async function loadSettings() {
@@ -50,16 +77,17 @@ if (location.protocol === "http:" && location.hostname === "127.0.0.1") {
     event.preventDefault();
     button.disabled = true;
     try {
+      if (!networkSelect.value) throw new Error("接続するWi-Fiを一覧から選択してください。");
       if (!password.value) throw new Error("Wi-Fiパスワードを入力してください。");
       status.textContent = "COMポートを選択し、基板への保存と接続確認を待っています…";
       const result = await window.configureSpresenseWifi({
-        ssid: ssid.value,
+        ssid: networkSelect.value,
         password: password.value,
         receiver: form.dataset.receiver,
         port: Number(form.dataset.port),
       });
-      updateNetworks(ssid.value);
-      localStorage.setItem(lastSsidKey, ssid.value);
+      savedNetworks(networkSelect.value);
+      localStorage.setItem(lastSsidKey, networkSelect.value);
       password.value = "";
       status.textContent = result.connected
         ? "基板に保存し、新しいWi-Fiへ接続しました。「Wi-Fiで受信」を押してください。"
@@ -70,6 +98,8 @@ if (location.protocol === "http:" && location.hostname === "127.0.0.1") {
       button.disabled = false;
     }
   });
+
+  refreshNetworks.addEventListener("click", () => scanNetworks());
 
   loadSettings();
 }

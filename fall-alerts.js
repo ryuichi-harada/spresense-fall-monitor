@@ -1,6 +1,7 @@
 "use strict";
 
-const alertStorageKey = "spresense.fall-history.v1";
+const alertStorageKey = "spresense.fall-history.v2";
+const legacyAlertStorageKey = "spresense.fall-history.v1";
 const sensitivity = document.getElementById("sensitivity");
 const scorePeak = document.getElementById("score-peak");
 const acknowledgeButton = document.getElementById("acknowledge-fall");
@@ -53,14 +54,20 @@ function newEventId() {
 
 function readFallHistory() {
   try {
-    const data = JSON.parse(localStorage.getItem(alertStorageKey) ?? "[]");
+    const current = localStorage.getItem(alertStorageKey);
+    const isLegacyMigration = current === null;
+    const data = JSON.parse(current ?? localStorage.getItem(legacyAlertStorageKey) ?? "[]");
     if (!Array.isArray(data)) throw new Error("Invalid fall history");
-    fallEvents = data.map((event) => ({
+    // Old trial alerts predate the Level 1 decision flow. Keep completed logs,
+    // but do not reopen an unfinished trial every time the app starts.
+    const migrated = isLegacyMigration ? data.filter((event) => event.confirmedAt) : data;
+    fallEvents = migrated.map((event) => ({
       eventId: event.eventId ?? newEventId(),
       recognizedState: event.recognizedState ?? "fall_candidate",
       proposals: event.proposals ?? actionProposals,
       ...event,
     }));
+    if (isLegacyMigration) saveFallHistory();
   } catch {
     storageStatus.textContent = "ブラウザの履歴を読み込めません。";
   }

@@ -89,9 +89,14 @@
       <summary>設定</summary>
       <h3>SpresenseのWi-Fi</h3>
       <form id="wifi-config-form" hidden>
-        <label for="wifi-ssid">接続先のSSID</label>
-        <input id="wifi-ssid" list="wifi-known-networks" required maxlength="32" autocomplete="off">
-        <datalist id="wifi-known-networks"></datalist>
+        <label for="wifi-network-select">周囲のWi-Fiから選択</label>
+        <div class="wifi-picker">
+          <select id="wifi-network-select">
+            <option value="">検索しています…</option>
+          </select>
+          <button type="button" id="wifi-networks-refresh">再検索</button>
+        </div>
+        <p class="hint">SpresenseのWi-Fi基板は2.4GHz対応です。「5G」等の名前が付いたSSIDは選ばないでください。</p>
         <label for="wifi-password">Wi-Fiパスワード</label>
         <input id="wifi-password" type="password" maxlength="64" autocomplete="new-password">
         <button type="submit" id="wifi-config-save" class="primary">USBで基板へ設定</button>
