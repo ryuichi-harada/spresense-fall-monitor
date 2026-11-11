@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spresense IMU モニター</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="fall-model.js" defer></script>
+  <script src="fall-inference.js" defer></script>
+  <script src="fall-alerts.js" defer></script>
+  <script src="monitor.js" defer></script>
+  <script src="wifi-settings.js" defer></script>
+</head>
+<body>
+  <main>
+    <nav class="masthead" aria-label="モニター情報">
+      <span><b class="mark" aria-hidden="true">∿</b> Spresense Monitor</span>
+      <span class="local">ローカルモニター</span>
+    </nav>
+    <header>
+      <p class="eyebrow">SPRESENSE / BMI270</p>
+      <h1>IMU ライブモニター</h1>
+      <p>加速度と角速度をリアルタイムで確認できます。</p>
+    </header>
+    <section class="panel estimate" id="estimate" data-state="waiting" aria-labelledby="estimate-label">
+      <p id="estimate-label" class="eyebrow">現在の推定 <span>試作モデル</span></p>
+      <h2 id="estimate-value" role="status">接続を待っています</h2>
+      <p id="estimate-detail">腰に装着したセンサーの直近2秒から、転倒の兆候を推定します。</p>
+      <section id="decision-panel" class="decision-panel" aria-labelledby="decision-title" hidden>
+        <div class="decision-heading">
+          <div>
+            <p class="eyebrow">HUMAN IN THE LOOP</p>
+            <h3 id="decision-title">次の行動を選んでください</h3>
+          </div>
+          <span class="level-badge">Agentic IoT Level 1</span>
+        </div>
+        <p class="decision-intro">センサーだけでは本人の状態を断定できません。状況に合う行動を人が選択します。</p>
+        <div id="action-proposals" class="action-proposals"></div>
+        <div id="decision-completion" class="decision-completion" hidden>
+          <label for="decision-outcome">確認結果</label>
+          <select id="decision-outcome">
+            <option value="safe">異常なし</option>
+            <option value="assisted">声掛け・介助で対応</option>
+            <option value="nearby_support">周囲の人が対応</option>
+            <option value="rescue_requested">救援連絡を実施</option>
+            <option value="unknown">未確認のまま終了</option>
+          </select>
+          <button id="acknowledge-fall" class="primary acknowledge">結果を記録して完了</button>
+        </div>
+        <p id="decision-status" class="hint" role="status"></p>
+      </section>
+      <div class="posture">
+        <label for="sensitivity">検知感度</label>
+        <select id="sensitivity">
+          <option value="0.90">標準</option>
+          <option value="0.75" selected>高め</option>
+          <option value="0.60">さらに高め</option>
+        </select>
+        <span id="score-peak">接続中の最高スコア —</span>
+      </div>
+      <div class="posture">
+        <button id="calibrate" disabled>立位を基準にする</button>
+        <span id="posture-status">基準姿勢は未設定</span>
+      </div>
+    </section>
+    <section class="panel controls" aria-label="接続と記録">
+      <div class="toolbar connection">
+        <button id="connect" class="primary">USBに接続</button>
+        <button id="connect-wifi">Wi-Fiで受信</button>
+        <button id="disconnect" disabled>切断</button>
+        <span id="status" class="status" role="status">未接続</span>
+      </div>
+      <div class="toolbar">
+        <label for="activity">動作</label>
+        <select id="activity">
+          <option value="unlabeled">未分類</option>
+          <option value="still">静止</option>
+          <option value="walking">歩行</option>
+          <option value="sitting_down">着座</option>
+          <option value="standing_up">起立</option>
+        </select>
+        <button id="record" disabled>記録開始</button>
+        <button id="save" disabled>CSV保存</button>
+        <span id="record-status">記録なし</span>
+      </div>
+      <p class="hint" id="usb-hint">USB接続ではポート選択で CP210x を選びます。接続前にArduino IDEのシリアルモニターとプロッターを閉じてください。</p>
+    </section>
+    <details class="panel wifi-settings" id="wifi-settings" hidden>
+      <summary>設定</summary>
+      <h3>SpresenseのWi-Fi</h3>
+      <form id="wifi-config-form" hidden>
+        <label for="wifi-ssid">接続先のSSID</label>
+        <input id="wifi-ssid" list="wifi-known-networks" required maxlength="32" autocomplete="off">
+        <datalist id="wifi-known-networks"></datalist>
+        <label for="wifi-password">Wi-Fiパスワード</label>
+        <input id="wifi-password" type="password" maxlength="64" autocomplete="new-password">
+        <button type="submit" id="wifi-config-save" class="primary">USBで基板へ設定</button>
+      </form>
+      <p id="wifi-settings-status" class="hint" role="status">設定を読み込んでいます。</p>
+      <p class="hint">この機能の初回導入後は、Wi-Fi変更のためにArduino IDEで再書き込みする必要はありません。設定時だけSpresenseをUSB接続します。</p>
+      <p class="hint">ESP8266は2.4GHz Wi-Fiを使用します。企業認証や端末間通信を禁止するネットワークでは接続できない場合があります。</p>
+    </details>
+    <div class="section-heading">
+      <h2>ライブ波形</h2>
+      <div class="legend" aria-label="軸の凡例">
+        <span class="x">X軸</span><span class="y">Y軸</span><span class="z">Z軸</span>
+        <span class="window">直近10秒</span>
+      </div>
+    </div>
+    <div class="charts">
+      <section class="panel">
+        <h3>加速度 <small>m/s²</small></h3>
+        <canvas id="accel" role="img" aria-label="3軸加速度のグラフ"></canvas>
+        <output id="accel-values">X —　Y —　Z —</output>
+      </section>
+      <section class="panel">
+        <h3>角速度 <small>°/s</small></h3>
+        <canvas id="gyro" role="img" aria-label="3軸角速度のグラフ"></canvas>
+        <output id="gyro-values">X —　Y —　Z —</output>
+      </section>
+    </div>
+    <section class="panel history" aria-labelledby="history-title">
+      <div class="section-heading">
+        <h2 id="history-title">Decision Log</h2>
+        <button id="export-falls" disabled>Decision LogをCSV保存</button>
+      </div>
+      <p id="fall-storage-status" class="hint">検知根拠・行動候補・人の選択・結果を、このブラウザに保存します。</p>
+      <ul id="fall-history"></ul>
+    </section>
+  </main>
+</body>
+</html>
