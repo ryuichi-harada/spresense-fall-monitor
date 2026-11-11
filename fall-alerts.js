@@ -52,22 +52,24 @@ function newEventId() {
   return crypto.randomUUID?.() ?? `fall-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function readFallHistory() {
+function readFallHistory(discardPending = false) {
   try {
     const current = localStorage.getItem(alertStorageKey);
     const isLegacyMigration = current === null;
     const data = JSON.parse(current ?? localStorage.getItem(legacyAlertStorageKey) ?? "[]");
     if (!Array.isArray(data)) throw new Error("Invalid fall history");
-    // Old trial alerts predate the Level 1 decision flow. Keep completed logs,
-    // but do not reopen an unfinished trial every time the app starts.
-    const migrated = isLegacyMigration ? data.filter((event) => event.confirmedAt) : data;
+    // A new monitoring session starts in the waiting state. Completed decisions
+    // remain in the log, but an unfinished alert from a previous session is not reopened.
+    const migrated = isLegacyMigration || discardPending
+      ? data.filter((event) => event.confirmedAt)
+      : data;
     fallEvents = migrated.map((event) => ({
       eventId: event.eventId ?? newEventId(),
       recognizedState: event.recognizedState ?? "fall_candidate",
       proposals: event.proposals ?? actionProposals,
       ...event,
     }));
-    if (isLegacyMigration) saveFallHistory();
+    if (isLegacyMigration || discardPending) saveFallHistory();
   } catch {
     storageStatus.textContent = "ブラウザの履歴を読み込めません。";
   }
@@ -215,5 +217,5 @@ window.addEventListener("storage", (event) => {
   renderFallHistory();
 });
 
-readFallHistory();
+readFallHistory(true);
 renderFallHistory();
